@@ -1,18 +1,21 @@
+import os
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from app.database import engine
 from app.models import models
 
-# Crea las 4 tablas en PostgreSQL automáticamente al iniciar
+# Asegura que la carpeta static exista para evitar errores al montar
+os.makedirs("app/static", exist_ok=True)
+
 try:
     models.Base.metadata.create_all(bind=engine)
 except Exception as e:
-    print(f"Aviso de conexión DB inicial: {e}")
+    print(f"Aviso de conexión DB: {e}")
 
 app = FastAPI(
     title="Generador de Recetas con Inventario e IA",
-    description="API REST y aplicación web para gestión de inventario y generación de recetas estructuradas mediante LLM.",
+    description="API REST y aplicación web para gestión de inventario y generación de recetas mediante LLM.",
     version="1.0.0"
 )
 
@@ -27,9 +30,6 @@ def read_root():
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Recetas IA - Inventario Inteligente</title>
-        <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
-        <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
         <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
         <style>
             body { font-family: system-ui, -apple-system, sans-serif; background: #f4f6f9; color: #1e293b; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
@@ -38,7 +38,6 @@ def read_root():
             p { color: #475569; line-height: 1.6; }
             .badge { display: inline-block; background: #dcfce7; color: #166534; padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem; }
             .btn { display: inline-block; margin-top: 1.2rem; background: #2563eb; color: white; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; }
-            .btn:hover { background: #1d4ed8; }
         </style>
     </head>
     <body>
@@ -54,4 +53,4 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "recetas-ia"}
+    return {"status": "ok"}
