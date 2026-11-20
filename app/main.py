@@ -21,8 +21,10 @@ app = FastAPI(
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-from app.routers import auth
+from app.routers import auth, ingredients
+
 app.include_router(auth.router)
+app.include_router(ingredients.router)
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
