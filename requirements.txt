@@ -12,3 +12,5 @@ pytest==8.1.1
 requests==2.31.0
 python-dotenv
 psycopg2-binary
+email-validator
+bcrypt==4.0.1
