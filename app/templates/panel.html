@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Panel - Recetas IA{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>1. Autenticación (JWT)</h2>
+    <p>Inicia sesión con tu cuenta registrada para obtener tu token de acceso.</p>
+    <input type="email" id="email" placeholder="correo@ejemplo.com" style="padding:0.5rem; margin-right:0.5rem;">
+    <input type="password" id="password" placeholder="Contraseña" style="padding:0.5rem; margin-right:0.5rem;">
+    <button class="btn" onclick="login()">Iniciar Sesión</button>
+    <p id="auth-status" style="margin-top:0.75rem; font-weight:600;"></p>
+</div>
+
+<div class="card">
+    <h2>2. Mis Ingredientes</h2>
+    <input type="text" id="ing-nombre" placeholder="Nombre (ej. Pollo)" style="padding:0.5rem; margin-right:0.4rem;">
+    <input type="number" step="any" id="ing-cantidad" placeholder="Cantidad" style="padding:0.5rem; width:100px; margin-right:0.4rem;">
+    <input type="text" id="ing-unidad" placeholder="Unidad (ej. g)" style="padding:0.5rem; width:100px; margin-right:0.4rem;">
+    <button class="btn" onclick="addIngredient()">Agregar</button>
+    <button class="btn" style="background:#475569;" onclick="loadIngredients()">Actualizar Lista</button>
+    <ul id="ingredients-list" style="margin-top:1rem;"></ul>
+</div>
+
+<div class="card">
+    <h2>3. Generar Receta con IA</h2>
+    <input type="text" id="pref" placeholder="Preferencias (opcional, ej. rápida y saludable)" style="padding:0.5rem; width:60%; margin-right:0.5rem;">
+    <button class="btn" onclick="generateRecipe()">Generar Receta</button>
+    <div id="recipe-result" style="margin-top:1rem; white-space:pre-wrap; background:#f8fafc; padding:1rem; border-radius:8px;"></div>
+</div>
+
+<script>
+let token = localStorage.getItem("jwt_token") || "";
+if (token) {
+    document.getElementById("auth-status").innerText = "Token cargado desde el navegador.";
+}
+
+function authHeaders() {
+    return {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+    };
+}
+
+async function login() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    const formData = new URLSearchParams();
+    formData.append("username", email);
+    formData.append("password", password);
+
+    const res = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData
+    });
+    const data = await res.json();
+    if (res.ok && data.access_token) {
+        token = data.access_token;
+        localStorage.setItem("jwt_token", token);
+        document.getElementById("auth-status").innerText = "Sesión iniciada correctamente.";
+        loadIngredients();
+    } else {
+        document.getElementById("auth-status").innerText = "Error: " + (data.detail || "No se pudo iniciar sesión");
+    }
+}
+
+async function addIngredient() {
+    const payload = {
+        nombre: document.getElementById("ing-nombre").value,
+        cantidad: parseFloat(document.getElementById("ing-cantidad").value),
+        unidad: document.getElementById("ing-unidad").value
+    };
+    const res = await fetch("/ingredients/", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+        loadIngredients();
+    } else {
+        alert("Error al agregar ingrediente. Verifica tu sesión.");
+    }
+}
+
+async function loadIngredients() {
+    const res = await fetch("/ingredients/", { headers: authHeaders() });
+    const listEl = document.getElementById("ingredients-list");
+    listEl.innerHTML = "";
+    if (!res.ok) return;
+    const items = await res.json();
+    items.forEach(item => {
+        const li = document.createElement("li");
+        li.innerText = `${item.nombre}: ${item.cantidad} ${item.unidad}`;
+        listEl.appendChild(li);
+    });
+}
+
+async function generateRecipe() {
+    const pref = document.getElementById("pref").value || null;
+    const res = await fetch("/recipes/generate", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ preferencias: pref, usar_inventario: true })
+    });
+    const data = await res.json();
+    document.getElementById("recipe-result").innerText = JSON.stringify(data, null, 2);
+}
+</script>
+{% endblock %}
