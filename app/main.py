@@ -1,4 +1,5 @@
 import os
+import sys
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,10 +11,11 @@ from fastapi.templating import Jinja2Templates
 # Asegura que la carpeta static exista para evitar errores al montar
 os.makedirs("app/static", exist_ok=True)
 
-try:
-    models.Base.metadata.create_all(bind=engine)
-except Exception as e:
-    print(f"Aviso de conexión DB: {e}")
+if "pytest" not in sys.modules:
+    try:
+        models.Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"Aviso de conexión DB: {e}")
 
 app = FastAPI(
     title="Generador de Recetas con Inventario e IA",
@@ -34,7 +36,7 @@ app.include_router(rating.router)
 
 @app.get("/panel", response_class=HTMLResponse)
 def view_panel(request: Request):
-    return templates.TemplateResponse("panel.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="panel.html")
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():

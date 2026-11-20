@@ -16,6 +16,7 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 @pytest.fixture()
 def db_session():
     Base.metadata.create_all(bind=engine)
@@ -25,6 +26,7 @@ def db_session():
     finally:
         db.close()
         Base.metadata.drop_all(bind=engine)
+
 
 @pytest.fixture()
 def client(db_session):
