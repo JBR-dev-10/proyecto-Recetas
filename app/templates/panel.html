@@ -3,17 +3,35 @@
 {% block title %}Panel - Recetas IA{% endblock %}
 
 {% block content %}
-<div class="card">
-    <h2>1. Autenticación (JWT)</h2>
-    <p>Inicia sesión con tu cuenta registrada para obtener tu token de acceso.</p>
-    <input type="email" id="email" placeholder="correo@ejemplo.com" style="padding:0.5rem; margin-right:0.5rem;">
-    <input type="password" id="password" placeholder="Contraseña" style="padding:0.5rem; margin-right:0.5rem;">
-    <button class="btn" onclick="login()">Iniciar Sesión</button>
-    <p id="auth-status" style="margin-top:0.75rem; font-weight:600;"></p>
+<div class="card" id="auth-card">
+    <h2>Autenticación (JWT)</h2>
+
+    <div id="logged-out-view">
+        <h3>Registrarse</h3>
+        <p>Crea una cuenta nueva si aún no tienes una.</p>
+        <input type="email" id="reg-email" placeholder="nuevo@ejemplo.com" style="padding:0.5rem; margin-right:0.5rem;">
+        <input type="password" id="reg-password" placeholder="Contraseña" style="padding:0.5rem; margin-right:0.5rem;">
+        <button class="btn" onclick="registerUser()">Registrarse</button>
+        <p id="reg-status" style="margin-top:0.5rem; font-weight:600;"></p>
+
+        <hr style="margin:1.5rem 0; border:0; border-top:1px solid #e2e8f0;">
+
+        <h3>Iniciar Sesión</h3>
+        <p>Ingresa con tu correo y contraseña para habilitar tu inventario y recetas.</p>
+        <input type="email" id="login-email" placeholder="correo@ejemplo.com" style="padding:0.5rem; margin-right:0.5rem;">
+        <input type="password" id="login-password" placeholder="Contraseña" style="padding:0.5rem; margin-right:0.5rem;">
+        <button class="btn" onclick="loginUser()">Iniciar Sesión</button>
+        <p id="login-status" style="margin-top:0.5rem; font-weight:600;"></p>
+    </div>
+
+    <div id="logged-in-view" style="display:none;">
+        <p id="session-info" style="font-weight:600; color:#15803d;">Sesión activa con JWT.</p>
+        <button class="btn" style="background:#dc2626;" onclick="logoutUser()">Cerrar Sesión</button>
+    </div>
 </div>
 
-<div class="card">
-    <h2>2. Mis Ingredientes</h2>
+<div class="card" id="ingredients-card" style="display:none;">
+    <h2>Mis Ingredientes</h2>
     <input type="text" id="ing-nombre" placeholder="Nombre (ej. Pollo)" style="padding:0.5rem; margin-right:0.4rem;">
     <input type="number" step="any" id="ing-cantidad" placeholder="Cantidad" style="padding:0.5rem; width:100px; margin-right:0.4rem;">
     <input type="text" id="ing-unidad" placeholder="Unidad (ej. g)" style="padding:0.5rem; width:100px; margin-right:0.4rem;">
@@ -22,8 +40,8 @@
     <ul id="ingredients-list" style="margin-top:1rem;"></ul>
 </div>
 
-<div class="card">
-    <h2>3. Generar Receta con IA</h2>
+<div class="card" id="recipes-card" style="display:none;">
+    <h2>Generar Receta con IA</h2>
     <input type="text" id="pref" placeholder="Preferencias (opcional, ej. rápida y saludable)" style="padding:0.5rem; width:60%; margin-right:0.5rem;">
     <button class="btn" onclick="generateRecipe()">Generar Receta</button>
     <div id="recipe-result" style="margin-top:1rem; white-space:pre-wrap; background:#f8fafc; padding:1rem; border-radius:8px;"></div>
@@ -31,8 +49,17 @@
 
 <script>
 let token = localStorage.getItem("jwt_token") || "";
-if (token) {
-    document.getElementById("auth-status").innerText = "Token cargado desde el navegador.";
+
+function updateUI() {
+    const isLoggedIn = Boolean(token);
+    document.getElementById("logged-out-view").style.display = isLoggedIn ? "none" : "block";
+    document.getElementById("logged-in-view").style.display = isLoggedIn ? "block" : "none";
+    document.getElementById("ingredients-card").style.display = isLoggedIn ? "block" : "none";
+    document.getElementById("recipes-card").style.display = isLoggedIn ? "block" : "none";
+
+    if (isLoggedIn) {
+        loadIngredients();
+    }
 }
 
 function authHeaders() {
@@ -42,9 +69,33 @@ function authHeaders() {
     };
 }
 
-async function login() {
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
+async function registerUser() {
+    const email = document.getElementById("reg-email").value.trim();
+    const password = document.getElementById("reg-password").value;
+    const statusEl = document.getElementById("reg-status");
+
+    const res = await fetch("/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+        statusEl.style.color = "#15803d";
+        statusEl.innerText = "Registro exitoso. Ahora inicia sesión abajo.";
+        document.getElementById("login-email").value = email;
+    } else {
+        statusEl.style.color = "#dc2626";
+        statusEl.innerText = "Error: " + (data.detail || "No se pudo registrar");
+    }
+}
+
+async function loginUser() {
+    const email = document.getElementById("login-email").value.trim();
+    const password = document.getElementById("login-password").value;
+    const statusEl = document.getElementById("login-status");
+
     const formData = new URLSearchParams();
     formData.append("username", email);
     formData.append("password", password);
@@ -55,21 +106,31 @@ async function login() {
         body: formData
     });
     const data = await res.json();
+
     if (res.ok && data.access_token) {
         token = data.access_token;
         localStorage.setItem("jwt_token", token);
-        document.getElementById("auth-status").innerText = "Sesión iniciada correctamente.";
-        loadIngredients();
+        statusEl.innerText = "";
+        updateUI();
     } else {
-        document.getElementById("auth-status").innerText = "Error: " + (data.detail || "No se pudo iniciar sesión");
+        statusEl.style.color = "#dc2626";
+        statusEl.innerText = "Error: " + (data.detail || "Credenciales inválidas");
     }
+}
+
+function logoutUser() {
+    token = "";
+    localStorage.removeItem("jwt_token");
+    document.getElementById("ingredients-list").innerHTML = "";
+    document.getElementById("recipe-result").innerText = "";
+    updateUI();
 }
 
 async function addIngredient() {
     const payload = {
-        nombre: document.getElementById("ing-nombre").value,
+        nombre: document.getElementById("ing-nombre").value.trim(),
         cantidad: parseFloat(document.getElementById("ing-cantidad").value),
-        unidad: document.getElementById("ing-unidad").value
+        unidad: document.getElementById("ing-unidad").value.trim()
     };
     const res = await fetch("/ingredients/", {
         method: "POST",
@@ -77,9 +138,12 @@ async function addIngredient() {
         body: JSON.stringify(payload)
     });
     if (res.ok) {
+        document.getElementById("ing-nombre").value = "";
+        document.getElementById("ing-cantidad").value = "";
+        document.getElementById("ing-unidad").value = "";
         loadIngredients();
     } else {
-        alert("Error al agregar ingrediente. Verifica tu sesión.");
+        alert("Error al agregar ingrediente. Verifica los campos o tu sesión.");
     }
 }
 
@@ -87,7 +151,10 @@ async function loadIngredients() {
     const res = await fetch("/ingredients/", { headers: authHeaders() });
     const listEl = document.getElementById("ingredients-list");
     listEl.innerHTML = "";
-    if (!res.ok) return;
+    if (!res.ok) {
+        if (res.status === 401) logoutUser();
+        return;
+    }
     const items = await res.json();
     items.forEach(item => {
         const li = document.createElement("li");
@@ -97,7 +164,7 @@ async function loadIngredients() {
 }
 
 async function generateRecipe() {
-    const pref = document.getElementById("pref").value || null;
+    const pref = document.getElementById("pref").value.trim() || null;
     const res = await fetch("/recipes/generate", {
         method: "POST",
         headers: authHeaders(),
@@ -106,5 +173,7 @@ async function generateRecipe() {
     const data = await res.json();
     document.getElementById("recipe-result").innerText = JSON.stringify(data, null, 2);
 }
+
+updateUI();
 </script>
 {% endblock %}
