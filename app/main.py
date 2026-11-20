@@ -4,6 +4,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from app.database import engine
 from app.models import models
+from fastapi import FastAPI, Request
+from fastapi.templating import Jinja2Templates
 
 # Asegura que la carpeta static exista para evitar errores al montar
 os.makedirs("app/static", exist_ok=True)
@@ -21,12 +23,18 @@ app = FastAPI(
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-from app.routers import auth, ingredients, recipes, ratings
+templates = Jinja2Templates(directory="app/templates")
+
+from app.routers import auth, ingredient, recipes, rating
 
 app.include_router(auth.router)
-app.include_router(ingredients.router)
+app.include_router(ingredient.router)
 app.include_router(recipes.router)
-app.include_router(ratings.router)
+app.include_router(rating.router)
+
+@app.get("/panel", response_class=HTMLResponse)
+def view_panel(request: Request):
+    return templates.TemplateResponse("panel.html", {"request": request})
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
